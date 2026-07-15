@@ -1,0 +1,35 @@
+# Core framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# Database
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+pgvector==0.3.4
+alembic==1.13.3
+
+# Validation / config
+pydantic==2.9.2
+pydantic-settings==2.5.2
+python-dotenv==1.0.1
+
+# PDF extraction
+pymupdf==1.24.10
+pdfplumber==0.11.4
+pytesseract==0.3.13
+Pillow==10.4.0
+
+# Embeddings / LLM
+google-generativeai==0.8.3
+groq==0.11.0
+
+# Chunking
+langchain-text-splitters==0.3.0
+
+# Charts
+matplotlib==3.9.2
+
+# Utils
+tenacity==9.0.0
+python-multipart==0.0.12
+structlog==24.4.0
