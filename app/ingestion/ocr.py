@@ -9,6 +9,9 @@ import pytesseract
 from PIL import Image
 
 from app.core.logging_config import get_logger
+# top of app/ingestion/ocr.py
+import pytesseract
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 logger = get_logger(__name__)
 

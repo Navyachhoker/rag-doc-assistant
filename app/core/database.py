@@ -1,3 +1,9 @@
+"""
+Key change from earlier phases: embedding and caption are now nullable.
+NULL means "not yet processed" — this is what makes resumability possible.
+A document's overall progress is queryable as "how many chunks/images
+still have embedding IS NULL" rather than tracked in a separate table.
+"""
 from datetime import datetime, timezone
 
 from pgvector.sqlalchemy import Vector
@@ -20,13 +26,20 @@ class Base(DeclarativeBase):
     pass
 
 
+
+
+
+
 class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True)
     filename = Column(String(512), nullable=False)
-    file_type = Column(String(32), nullable=False)  # pdf | docx | pptx | image
-    status = Column(String(32), default="processing")  # processing | ready | failed
+    file_type = Column(String(32), nullable=False)
+    # New stages replace the old binary processing/ready/failed:
+    # extracting -> embedding_text -> captioning_images -> ready
+    # 'failed' can happen at any stage; resume picks up from wherever it stopped.
+    status = Column(String(32), default="extracting")
     uploaded_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -44,20 +57,19 @@ class DocumentChunk(Base):
     content = Column(Text, nullable=False)
     page_number = Column(Integer, nullable=True)
     chunk_index = Column(Integer, nullable=False)
-    embedding = Column(Vector(EMBEDDING_DIM), nullable=False)
+    embedding = Column(Vector(EMBEDDING_DIM), nullable=True)  # NULL = not yet embedded
 
     document = relationship("Document", back_populates="chunks")
-
 
 class DocumentImage(Base):
     __tablename__ = "document_images"
 
     id = Column(Integer, primary_key=True)
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
-    file_path = Column(String(1024), nullable=False)  # served path/URL
-    caption = Column(Text, nullable=False)  # Gemini Vision generated description
+    file_path = Column(String(1024), nullable=False)
+    caption = Column(Text, nullable=True)       # NULL = not yet captioned
     page_number = Column(Integer, nullable=True)
-    embedding = Column(Vector(EMBEDDING_DIM), nullable=False)  # embedding of caption
+    embedding = Column(Vector(EMBEDDING_DIM), nullable=True)  # NULL = not yet embedded
 
     document = relationship("Document", back_populates="images")
 

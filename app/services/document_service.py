@@ -94,3 +94,24 @@ def delete_document(db: Session, document_id: int) -> bool:
     db.delete(document)
     db.commit()
     return True
+
+
+def resume_ingestion(db: Session, document_id: int, pipeline: IngestionPipeline) -> Document:
+    """
+    Re-runs the pipeline against a document that's 'failed' or stuck
+    mid-stage. No file_path needed — extraction stage is skipped if
+    chunks/images already exist, per pipeline.run()'s stage-check logic.
+    """
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise ValueError(f"Document {document_id} not found")
+
+    if document.status == "ready":
+        return document  # nothing to do
+
+    try:
+        pipeline.run(db, document, file_path=None)
+    except Exception as exc:
+        logger.error("resume_ingestion_failed", document_id=document_id, error=str(exc))
+
+    return document
