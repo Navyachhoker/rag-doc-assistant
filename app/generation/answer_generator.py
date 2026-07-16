@@ -14,17 +14,6 @@ from app.generation.prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, build_im
 from app.retrieval.relevance import filter_relevant_images
 from app.retrieval.retriever import RetrievedChunkResult, RetrievedImageResult
 
-"""
-Additions to Phase 6's AnswerGenerator: parses [CHART:{...}] tags,
-renders them via chart_generator, persists via ImageStore, and inlines
-them the same way retrieved [IMAGE:n] tags are inlined.
-"""
-import json
-import re
-
-from app.generation.chart_generator import ChartGenerationError, generate_chart
-from app.storage.image_store import ImageStore
-
 settings = get_settings()
 logger = get_logger(__name__)
 
@@ -99,7 +88,16 @@ class AnswerGenerator:
         return final_answer, used_images
     
     
+    """
+Additions to Phase 6's AnswerGenerator: parses [CHART:{...}] tags,
+renders them via chart_generator, persists via ImageStore, and inlines
+them the same way retrieved [IMAGE:n] tags are inlined.
+"""
+import json
+import re
 
+from app.generation.chart_generator import ChartGenerationError, generate_chart
+from app.storage.image_store import ImageStore
 
 CHART_TAG_PATTERN = re.compile(r"\[CHART:(\{.*?\})\]", re.DOTALL)
 

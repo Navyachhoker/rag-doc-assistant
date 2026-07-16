@@ -50,3 +50,22 @@ async def delete_document(document_id: int, db: Session = Depends(get_db)):
     if not deleted:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"message": "Document deleted"}
+
+
+@router.post("/{document_id}/resume", response_model=DocumentUploadResponse)
+async def resume_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    pipeline: IngestionPipeline = Depends(get_ingestion_pipeline),
+):
+    try:
+        document = document_service.resume_ingestion(db, document_id, pipeline)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    return DocumentUploadResponse(
+        document_id=document.id,
+        filename=document.filename,
+        status=document.status,
+        message=f"Resumed from stage, now: {document.status}",
+    )

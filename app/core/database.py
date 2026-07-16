@@ -13,7 +13,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 from app.config import get_settings
 
 settings = get_settings()
-
+print("DATABASE URL:", settings.database_url)
 engine = create_engine(settings.database_url, pool_pre_ping=True)
 #ool_pre_ping checks the whether the connection is still alive, 
 # if dead, a fresh connection is created 
