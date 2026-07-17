@@ -1,9 +1,4 @@
-"""
-Key change from earlier phases: embedding and caption are now nullable.
-NULL means "not yet processed" — this is what makes resumability possible.
-A document's overall progress is queryable as "how many chunks/images
-still have embedding IS NULL" rather than tracked in a separate table.
-"""
+
 from datetime import datetime, timezone
 
 from pgvector.sqlalchemy import Vector

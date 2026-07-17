@@ -1,8 +1,4 @@
-"""
-Calls Groq's Llama 3.3 70B to generate the final answer, then post-processes
-the response to convert [IMAGE:n] tags into real inline markdown image
-references, and [CHART:{...}] tags into rendered, inlined charts.
-"""
+
 import json
 import re
 

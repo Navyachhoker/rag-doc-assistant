@@ -1,6 +1,6 @@
 """
 OCR utility used as a fallback when a PDF page has no extractable text layer
-(i.e., it's a scanned image). Also used for standalone image uploads that
+( scanned image). Also used for standalone image uploads that
 contain text (e.g., a photographed whiteboard or scanned form).
 """
 import io

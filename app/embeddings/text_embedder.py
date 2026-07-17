@@ -1,8 +1,4 @@
-"""
-Wraps the Gemini text-embedding-004 model. Includes retry logic since
-embedding calls run in a loop over many chunks/images during ingestion,
-and transient API errors shouldn't kill an entire document's processing.
-"""
+
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -21,13 +17,9 @@ class TextEmbedder:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def embed(self, text: str, task_type: str = "retrieval_document") -> list[float]:
-        """
-        task_type differs for indexing ('retrieval_document') vs querying
-        ('retrieval_query') — Gemini optimizes the embedding space differently
-        for each, so this distinction matters for retrieval quality.
-        """
+        
         if not text.strip():
-            # Avoid sending empty strings to the API; return a zero-ish
+            # Avoid sending empty strings to the API, return a zero-ish
             # placeholder to keep pipeline flow intact (caller should skip
             # persisting truly empty chunks upstream).
             text = " "
@@ -40,7 +32,4 @@ class TextEmbedder:
         return result["embedding"]
 
     def embed_batch(self, texts: list[str], task_type: str = "retrieval_document") -> list[list[float]]:
-        """Sequential batch embedding. Gemini's free tier has per-minute
-        rate limits, so this stays simple/sequential rather than firing
-        concurrent requests that could trip rate limiting."""
         return [self.embed(t, task_type=task_type) for t in texts]

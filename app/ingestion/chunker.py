@@ -21,11 +21,7 @@ class Chunk:
 
 
 def chunk_text_by_page(text_by_page: dict[int, str]) -> list[Chunk]:
-    """
-    Splits each page's text independently (so chunks never cross page
-    boundaries — this keeps page-number citations accurate) and returns
-    a flat, globally-indexed list of chunks.
-    """
+    
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,

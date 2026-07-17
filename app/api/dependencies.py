@@ -1,9 +1,4 @@
-"""
-Dependency providers. Using lru_cache instead of module-level singletons
-(as Phase 7 originally had) means these are lazily instantiated on first
-request rather than at import time — cleaner for testing, since you can
-override_dependency in tests without needing real API keys at import.
-"""
+
 from functools import lru_cache
 
 from app.embeddings.image_captioner import ImageCaptioner

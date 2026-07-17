@@ -1,6 +1,4 @@
-"""
-Query route — thin adapter delegating to query_service.
-"""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 

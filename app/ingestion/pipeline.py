@@ -1,15 +1,4 @@
-"""
-Ingestion runs as three independently-resumable stages:
 
-  1. extract          -> saves raw chunks + images to DB with embedding=NULL
-  2. embed_text        -> embeds any chunk where embedding IS NULL
-  3. caption_images    -> captions + embeds any image where caption IS NULL
-
-Each stage commits after every individual item, and each stage only
-processes rows still marked incomplete. A real captioning failure raises,
-which marks the document 'failed' — so calling resume() later will
-correctly re-enter this stage instead of skipping it.
-"""
 from sqlalchemy.orm import Session
 
 from app.core.database import Document, DocumentChunk, DocumentImage

@@ -1,12 +1,4 @@
-"""
-Streamlit chat UI for the RAG Document Assistant.
-Renders the assistant's markdown answer directly. Note: the backend
-returns image paths as relative URLs (/static/images/xyz.png) since it
-doesn't know its own public address. The frontend must rewrite these to
-absolute URLs pointing at the backend host before rendering, otherwise
-the browser tries to load them relative to Streamlit's own origin and
-they silently fail.
-"""
+
 import re
 
 import requests
@@ -65,7 +57,7 @@ with st.sidebar:
 
     uploaded_file = st.file_uploader(
         "Upload a document",
-        type=["pdf", "docx", "pptx", "png", "jpg", "jpeg"],
+        type=["pdf"],
     )
     if uploaded_file is not None and st.button("Upload & Process"):
         upload_document(uploaded_file)

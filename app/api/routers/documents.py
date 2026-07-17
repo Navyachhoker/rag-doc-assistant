@@ -1,7 +1,3 @@
-"""
-Document upload/list/delete routes. Pure HTTP adapter layer — no business
-logic here, only request/response handling and status code mapping.
-"""
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 

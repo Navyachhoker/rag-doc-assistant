@@ -1,10 +1,4 @@
-"""
-Uses Gemini Vision to generate a rich, searchable description of each
-extracted image. This caption is what gets embedded and matched against
-user queries. Real API failures are NOT swallowed here — they propagate
-up so the pipeline can correctly mark the document as failed and retry
-on resume, instead of silently treating a failed call as "nothing to see."
-"""
+
 import io
 
 import google.generativeai as genai

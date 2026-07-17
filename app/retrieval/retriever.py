@@ -1,7 +1,7 @@
 """
 Performs vector similarity search against both document_chunks and
 document_images using pgvector's cosine distance operator, then returns
-ranked results for each. The generation layer (Phase 6) decides how to
+ranked results for each. The generation layer decides how to
 weave these into a final answer.
 """
 from dataclasses import dataclass

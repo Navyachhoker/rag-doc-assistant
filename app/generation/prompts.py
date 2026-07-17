@@ -1,8 +1,4 @@
-"""
-Centralized prompt templates. Kept separate from answer_generator.py so
-prompt iteration (a routine task during evaluation/tuning) doesn't require
-touching orchestration logic.
-"""
+
 
 SYSTEM_PROMPT = """You are a document assistant that answers questions strictly using \
 the provided context (text excerpts and image descriptions from uploaded documents).

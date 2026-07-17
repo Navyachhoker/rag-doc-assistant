@@ -1,9 +1,4 @@
-"""
-Renders charts from LLM-provided structured data using matplotlib.
-Used when the answer benefits from visualizing numeric data found in the
-retrieved text (e.g., a table of quarterly figures) rather than just
-retrieving an existing image from the document.
-"""
+
 import io
 
 import matplotlib
