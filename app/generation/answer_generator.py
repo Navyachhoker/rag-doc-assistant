@@ -1,8 +1,9 @@
 """
 Calls Groq's Llama 3.3 70B to generate the final answer, then post-processes
 the response to convert [IMAGE:n] tags into real inline markdown image
-references (![caption](url)) that the Streamlit frontend can render directly.
+references, and [CHART:{...}] tags into rendered, inlined charts.
 """
+import json
 import re
 
 from groq import Groq
@@ -10,20 +11,24 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
 from app.core.logging_config import get_logger
+from app.generation.chart_generator import ChartGenerationError, generate_chart
 from app.generation.prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, build_image_context, build_text_context
 from app.retrieval.relevance import filter_relevant_images
 from app.retrieval.retriever import RetrievedChunkResult, RetrievedImageResult
+from app.storage.image_store import ImageStore
 
 settings = get_settings()
 logger = get_logger(__name__)
 
 IMAGE_TAG_PATTERN = re.compile(r"\[IMAGE:(\d+)\]")
+CHART_TAG_PATTERN = re.compile(r"\[CHART:(\{.*?\})\]", re.DOTALL)
 
 
 class AnswerGenerator:
     def __init__(self) -> None:
         self.client = Groq(api_key=settings.groq_api_key)
         self.model = settings.llm_model
+        self.image_store = ImageStore()
 
     def generate(
         self,
@@ -31,16 +36,13 @@ class AnswerGenerator:
         chunks: list[RetrievedChunkResult],
         images: list[RetrievedImageResult],
     ) -> tuple[str, list[RetrievedImageResult]]:
-        """
-        Returns (final_markdown_answer, images_actually_used).
-        images_actually_used lets the API response report exactly which
-        images the model chose to cite — useful for the frontend's
-        source panel, separate from the inline embeds.
-        """
         relevant_images = filter_relevant_images(images)
 
         raw_answer = self._call_llm(question, chunks, relevant_images)
-        final_answer, used_images = self._inject_inline_images(raw_answer, relevant_images)
+        answer_with_images, used_images = self._inject_inline_images(raw_answer, relevant_images)
+        final_answer = self._inject_generated_charts(
+            answer_with_images, document_id=chunks[0].chunk_id if chunks else 0
+        )
 
         return final_answer, used_images
 
@@ -58,7 +60,7 @@ class AnswerGenerator:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.2,  # low temperature: this is a factual QA task, not creative writing
+            temperature=0.2,
             max_tokens=1024,
         )
         return response.choices[0].message.content
@@ -66,11 +68,6 @@ class AnswerGenerator:
     def _inject_inline_images(
         self, raw_answer: str, images: list[RetrievedImageResult]
     ) -> tuple[str, list[RetrievedImageResult]]:
-        """
-        Replaces every [IMAGE:n] tag the model emitted with real markdown
-        image syntax, using the 1-indexed position that matched the
-        image_context list built in prompts.py.
-        """
         used_images: list[RetrievedImageResult] = []
 
         def replace_tag(match: re.Match) -> str:
@@ -79,50 +76,13 @@ class AnswerGenerator:
                 img = images[idx]
                 used_images.append(img)
                 return f"\n\n![{img.caption}]({img.file_path})\n"
-            # Model hallucinated a tag number outside range — drop it silently
-            # rather than showing a broken reference to the user.
             logger.warning("invalid_image_tag_referenced", tag_index=idx)
             return ""
 
         final_answer = IMAGE_TAG_PATTERN.sub(replace_tag, raw_answer)
         return final_answer, used_images
-    
-    
-    """
-Additions to Phase 6's AnswerGenerator: parses [CHART:{...}] tags,
-renders them via chart_generator, persists via ImageStore, and inlines
-them the same way retrieved [IMAGE:n] tags are inlined.
-"""
-import json
-import re
-
-from app.generation.chart_generator import ChartGenerationError, generate_chart
-from app.storage.image_store import ImageStore
-
-CHART_TAG_PATTERN = re.compile(r"\[CHART:(\{.*?\})\]", re.DOTALL)
-
-
-class AnswerGenerator:
-    def __init__(self) -> None:
-        # ... existing Groq client setup from Phase 6 ...
-        self.image_store = ImageStore()  # reuse the same store used for retrieved images
-
-    def generate(self, question, chunks, images):
-        relevant_images = filter_relevant_images(images)
-        raw_answer = self._call_llm(question, chunks, relevant_images)
-
-        answer_with_images, used_images = self._inject_inline_images(raw_answer, relevant_images)
-        final_answer = self._inject_generated_charts(answer_with_images, document_id=chunks[0].chunk_id if chunks else 0)
-
-        return final_answer, used_images
 
     def _inject_generated_charts(self, text: str, document_id: int) -> str:
-        """
-        Replaces every [CHART:{...}] tag with an inline rendered chart image.
-        If parsing or rendering fails (malformed JSON from the LLM), the tag
-        is stripped rather than shown broken to the user — the surrounding
-        text answer still stands on its own.
-        """
         def replace_chart(match: re.Match) -> str:
             raw_json = match.group(1)
             try:

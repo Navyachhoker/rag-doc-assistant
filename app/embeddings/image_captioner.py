@@ -1,8 +1,9 @@
 """
-Uses Gemini Vision (gemini-1.5-flash) to generate a rich, searchable
-description of each extracted image. This caption is what gets embedded
-and matched against user queries — it's the core trick that makes
-images retrievable via a text-based vector search.
+Uses Gemini Vision to generate a rich, searchable description of each
+extracted image. This caption is what gets embedded and matched against
+user queries. Real API failures are NOT swallowed here — they propagate
+up so the pipeline can correctly mark the document as failed and retry
+on resume, instead of silently treating a failed call as "nothing to see."
 """
 import io
 
@@ -33,16 +34,15 @@ class ImageCaptioner:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def caption(self, image_bytes: bytes) -> str:
-        try:
-            image = Image.open(io.BytesIO(image_bytes))
+        """
+        Returns "" ONLY for genuinely non-informative images (too small).
+        Any real API error is allowed to raise — the caller is responsible
+        for catching it and deciding how to handle the failure.
+        """
+        image = Image.open(io.BytesIO(image_bytes))
 
-            # Skip captioning trivially small images (icons, bullets, dividers)
-            # that add noise rather than retrievable signal.
-            if image.width < 50 or image.height < 50:
-                return ""
-
-            response = self.model.generate_content([CAPTION_PROMPT, image])
-            return response.text.strip()
-        except Exception as exc:
-            logger.warning("image_captioning_failed", error=str(exc))
+        if image.width < 50 or image.height < 50:
             return ""
+
+        response = self.model.generate_content([CAPTION_PROMPT, image])
+        return response.text.strip()

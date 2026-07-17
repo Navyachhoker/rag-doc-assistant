@@ -1,13 +1,19 @@
 """
 Streamlit chat UI for the RAG Document Assistant.
-Renders the assistant's markdown answer directly — since the backend
-already embeds ![caption](url) inline, Streamlit's st.markdown displays
-images inline in the chat bubble automatically, no extra parsing needed.
+Renders the assistant's markdown answer directly. Note: the backend
+returns image paths as relative URLs (/static/images/xyz.png) since it
+doesn't know its own public address. The frontend must rewrite these to
+absolute URLs pointing at the backend host before rendering, otherwise
+the browser tries to load them relative to Streamlit's own origin and
+they silently fail.
 """
+import re
+
 import requests
 import streamlit as st
 
 API_BASE_URL = "http://localhost:8000/api/v1"
+BACKEND_ROOT = "http://localhost:8000"  # static files are mounted here, not under /api/v1
 
 st.set_page_config(page_title="Document Assistant", page_icon="📄", layout="wide")
 
@@ -41,6 +47,16 @@ def upload_document(file):
             fetch_documents()
         else:
             st.sidebar.error(f"Upload failed: {resp.text}")
+
+
+def make_image_urls_absolute(markdown_text: str) -> str:
+    """
+    Converts ![caption](/static/images/xyz.png) into
+    ![caption](http://localhost:8000/static/images/xyz.png) so the
+    browser can actually resolve and load the image.
+    """
+    pattern = re.compile(r"!\[([^\]]*)\]\((/static/[^)]+)\)")
+    return pattern.sub(lambda m: f"![{m.group(1)}]({BACKEND_ROOT}{m.group(2)})", markdown_text)
 
 
 # ---------------- Sidebar ----------------
@@ -98,8 +114,8 @@ if question := st.chat_input("Ask a question about your uploaded documents..."):
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                answer = data["answer"]
-                st.markdown(answer)  # inline ![caption](url) images render automatically
+                answer = make_image_urls_absolute(data["answer"])
+                st.markdown(answer)
 
                 if data["source_chunks"]:
                     with st.expander(f"📚 Sources ({len(data['source_chunks'])} excerpts)"):

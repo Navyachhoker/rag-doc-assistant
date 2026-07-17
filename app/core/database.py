@@ -19,7 +19,7 @@ engine = create_engine(settings.database_url, pool_pre_ping=True)
 # if dead, a fresh connection is created 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-EMBEDDING_DIM = 768  # text-embedding-004 output dimension
+EMBEDDING_DIM =  3072 # text-embedding-004 output dimension
 
 
 class Base(DeclarativeBase):

@@ -65,13 +65,11 @@ class Retriever:
     def _search_chunks(
         self, db: Session, query_embedding: list[float], document_id: int | None
     ) -> list[RetrievedChunkResult]:
-        # cosine_distance: 0 = identical, 2 = opposite. We convert to a
-        # similarity score (1 - distance) so "higher is better" is consistent
-        # across chunks and images for downstream ranking/thresholding.
         stmt = select(
             DocumentChunk,
             DocumentChunk.embedding.cosine_distance(query_embedding).label("distance"),
-        )
+        ).where(DocumentChunk.embedding.isnot(None))
+
         if document_id is not None:
             stmt = stmt.where(DocumentChunk.document_id == document_id)
         stmt = stmt.order_by("distance").limit(settings.top_k_text)
@@ -93,7 +91,8 @@ class Retriever:
         stmt = select(
             DocumentImage,
             DocumentImage.embedding.cosine_distance(query_embedding).label("distance"),
-        )
+        ).where(DocumentImage.embedding.isnot(None))
+
         if document_id is not None:
             stmt = stmt.where(DocumentImage.document_id == document_id)
         stmt = stmt.order_by("distance").limit(settings.top_k_images)

@@ -68,7 +68,7 @@ async def process_upload(
     file_ext = validate_file(file.filename, contents)
     tmp_path = save_temp_file(contents, file_ext)
 
-    document = Document(filename=file.filename, file_type=file_ext, status="processing")
+    document = Document(filename=file.filename, file_type=file_ext, status="extracting")
     db.add(document)
     db.commit()
     db.refresh(document)
@@ -95,19 +95,24 @@ def delete_document(db: Session, document_id: int) -> bool:
     db.commit()
     return True
 
-
 def resume_ingestion(db: Session, document_id: int, pipeline: IngestionPipeline) -> Document:
     """
     Re-runs the pipeline against a document that's 'failed' or stuck
-    mid-stage. No file_path needed — extraction stage is skipped if
-    chunks/images already exist, per pipeline.run()'s stage-check logic.
+    mid-stage. Since 'failed' isn't itself a stage pipeline.run() knows
+    how to act on, we inspect the actual DB state first to figure out
+    which stage genuinely still has pending work, and reset status to
+    that stage before calling run().
     """
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise ValueError(f"Document {document_id} not found")
 
     if document.status == "ready":
-        return document  # nothing to do
+        return document
+
+    if document.status == "failed":
+        document.status = _determine_resume_stage(db, document)
+        db.commit()
 
     try:
         pipeline.run(db, document, file_path=None)
@@ -115,3 +120,31 @@ def resume_ingestion(db: Session, document_id: int, pipeline: IngestionPipeline)
         logger.error("resume_ingestion_failed", document_id=document_id, error=str(exc))
 
     return document
+
+
+def _determine_resume_stage(db: Session, document: Document) -> str:
+    """
+    Inspects actual chunk/image state to figure out which stage still
+    has incomplete work, since 'failed' alone doesn't tell us where.
+    """
+    from app.core.database import DocumentChunk, DocumentImage
+
+    has_pending_chunks = (
+        db.query(DocumentChunk)
+        .filter(DocumentChunk.document_id == document.id, DocumentChunk.embedding.is_(None))
+        .first()
+        is not None
+    )
+    if has_pending_chunks:
+        return "embedding_text"
+
+    has_pending_images = (
+        db.query(DocumentImage)
+        .filter(DocumentImage.document_id == document.id, DocumentImage.caption.is_(None))
+        .first()
+        is not None
+    )
+    if has_pending_images:
+        return "captioning_images"
+
+    return "ready"

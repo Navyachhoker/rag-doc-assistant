@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     #log_l -> tells us how info will log prints(debug,info,warning,error)
 
     # Models (pinned centrally so upgrades happen in one place)
-    embedding_model: str = "models/text-embedding-004" 
-    vision_model: str = "gemini-1.5-flash"
+    embedding_model: str = "models/gemini-embedding-001"
+    vision_model: str = "gemini-2.5-flash"
     llm_model: str = "llama-3.3-70b-versatile"
 
 

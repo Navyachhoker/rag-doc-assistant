@@ -1,15 +1,14 @@
 """
-Ingestion is now three independently-resumable stages instead of one
-all-or-nothing run:
+Ingestion runs as three independently-resumable stages:
 
-  1. extract   -> saves raw chunks + images to DB with embedding=NULL
-  2. embed_text -> embeds any chunk where embedding IS NULL
-  3. caption_images -> captions + embeds any image where caption IS NULL
+  1. extract          -> saves raw chunks + images to DB with embedding=NULL
+  2. embed_text        -> embeds any chunk where embedding IS NULL
+  3. caption_images    -> captions + embeds any image where caption IS NULL
 
-Each stage commits after every individual item (not just at the end),
-and each stage only processes rows still marked incomplete. This means
-calling run() again on a partially-failed document picks up exactly
-where it stopped — no wasted API calls, no re-extraction.
+Each stage commits after every individual item, and each stage only
+processes rows still marked incomplete. A real captioning failure raises,
+which marks the document 'failed' — so calling resume() later will
+correctly re-enter this stage instead of skipping it.
 """
 from sqlalchemy.orm import Session
 
@@ -24,7 +23,6 @@ from app.utils.rate_limiter import RateLimiter
 
 logger = get_logger(__name__)
 
-# Kept below Gemini's free-tier 10 RPM vision limit to leave headroom
 VISION_RATE_LIMITER = RateLimiter(max_calls=9, period_seconds=60.0)
 
 
@@ -35,11 +33,6 @@ class IngestionPipeline:
         self.image_store = ImageStore()
 
     def run(self, db: Session, document: Document, file_path: str | None = None) -> None:
-        """
-        file_path is only required on first run (extraction stage).
-        On resume, extraction is skipped entirely since chunks/images
-        already exist in the DB — file_path can be None.
-        """
         try:
             if document.status == "extracting":
                 if file_path is None:
@@ -72,7 +65,6 @@ class IngestionPipeline:
             raise
 
     def _extract(self, db: Session, document: Document, file_path: str) -> None:
-        """Stage 1: pure extraction, no API calls — cheap, so no need to checkpoint mid-stage."""
         extractor = get_extractor(document.file_type)
         extracted = extractor.extract(file_path)
 
@@ -89,7 +81,6 @@ class IngestionPipeline:
             )
 
         for extracted_image in extracted.images:
-            # Skip tiny/non-informative images before they ever reach the DB
             if self._is_too_small(extracted_image.image_bytes):
                 continue
             file_path_saved = self.image_store.save(
@@ -109,10 +100,6 @@ class IngestionPipeline:
         logger.info("extraction_stage_complete", document_id=document.id, chunks=len(chunks))
 
     def _embed_text_chunks(self, db: Session, document: Document) -> None:
-        """
-        Stage 2: only touches chunks with embedding IS NULL — on a resume,
-        already-embedded chunks from before the failure are skipped entirely.
-        """
         pending = (
             db.query(DocumentChunk)
             .filter(DocumentChunk.document_id == document.id, DocumentChunk.embedding.is_(None))
@@ -122,13 +109,15 @@ class IngestionPipeline:
 
         for chunk in pending:
             chunk.embedding = self.text_embedder.embed(chunk.content, task_type="retrieval_document")
-            db.commit()  # commit per-chunk: a crash after this line never re-embeds this chunk
+            db.commit()
 
     def _caption_images(self, db: Session, document: Document) -> None:
         """
-        Stage 3: only touches images with caption IS NULL. Rate-limited
-        via VISION_RATE_LIMITER since this is the stage that hits Gemini's
-        tighter vision RPM ceiling.
+        Only 'caption IS NULL' rows are pending. A genuinely uninformative
+        image (too small) gets caption='' and is done. A real API failure
+        leaves caption=NULL and is re-attempted on the next resume() call,
+        and raises at the end so the document is correctly marked 'failed'
+        rather than silently 'ready'.
         """
         pending = (
             db.query(DocumentImage)
@@ -137,22 +126,29 @@ class IngestionPipeline:
         )
         logger.info("captioning_images_pending", document_id=document.id, count=len(pending))
 
+        failures = 0
         for image in pending:
             VISION_RATE_LIMITER.wait_if_needed()
-
             image_bytes = self._read_image_bytes(image.file_path)
-            caption = self.image_captioner.caption(image_bytes)
+
+            try:
+                caption = self.image_captioner.caption(image_bytes)
+            except Exception as exc:
+                logger.warning("image_caption_failed", image_id=image.id, error=str(exc))
+                failures += 1
+                continue
 
             if not caption:
-                # Non-informative image (icon/divider) — mark with empty
-                # string rather than leaving NULL, so it isn't retried forever
                 image.caption = ""
                 db.commit()
                 continue
 
             image.caption = caption
             image.embedding = self.text_embedder.embed(caption, task_type="retrieval_document")
-            db.commit()  # commit per-image, same reasoning as text chunks
+            db.commit()
+
+        if failures > 0:
+            raise RuntimeError(f"{failures} image(s) failed captioning — document not fully ready")
 
     def _is_too_small(self, image_bytes: bytes) -> bool:
         from io import BytesIO
@@ -167,6 +163,5 @@ class IngestionPipeline:
         from pathlib import Path
         from app.config import get_settings
         settings = get_settings()
-        # relative_path is like /static/images/xyz.png — map back to disk path
         filename = relative_path.rsplit("/", 1)[-1]
         return (Path(settings.image_storage_path) / filename).read_bytes()
