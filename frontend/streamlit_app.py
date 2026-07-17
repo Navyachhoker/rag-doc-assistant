@@ -37,7 +37,7 @@ def fetch_documents():
 def upload_document(file):
     with st.spinner(f"Processing {file.name}... this can take a minute for scanned pages."):
         files = {"file": (file.name, file.getvalue())}
-        resp = requests.post(f"{API_BASE_URL}/documents/upload", files=files, timeout=300)
+        resp = requests.post(f"{API_BASE_URL}/documents/upload", files=files, timeout=600)
         if resp.status_code == 200:
             data = resp.json()
             if data["status"] == "ready":

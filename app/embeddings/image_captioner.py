@@ -9,8 +9,8 @@ import io
 
 import google.generativeai as genai
 from PIL import Image
-from tenacity import retry, stop_after_attempt, wait_exponential
-
+from google.api_core.exceptions import ResourceExhausted
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 from app.config import get_settings
 from app.core.logging_config import get_logger
 
@@ -32,7 +32,10 @@ class ImageCaptioner:
     def __init__(self) -> None:
         self.model = genai.GenerativeModel(settings.vision_model)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @retry(stop=stop_after_attempt(3),
+           wait=wait_exponential(multiplier=1, min=2, max=10),
+           retry=retry_if_not_exception_type(ResourceExhausted),
+           )
     def caption(self, image_bytes: bytes) -> str:
         """
         Returns "" ONLY for genuinely non-informative images (too small).

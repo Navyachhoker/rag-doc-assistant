@@ -20,6 +20,7 @@ from app.ingestion.chunker import chunk_text_by_page
 from app.ingestion.extractors import get_extractor
 from app.storage.image_store import ImageStore
 from app.utils.rate_limiter import RateLimiter
+from google.api_core.exceptions import ResourceExhausted
 
 logger = get_logger(__name__)
 
@@ -111,14 +112,9 @@ class IngestionPipeline:
             chunk.embedding = self.text_embedder.embed(chunk.content, task_type="retrieval_document")
             db.commit()
 
+    
+
     def _caption_images(self, db: Session, document: Document) -> None:
-        """
-        Only 'caption IS NULL' rows are pending. A genuinely uninformative
-        image (too small) gets caption='' and is done. A real API failure
-        leaves caption=NULL and is re-attempted on the next resume() call,
-        and raises at the end so the document is correctly marked 'failed'
-        rather than silently 'ready'.
-        """
         pending = (
             db.query(DocumentImage)
             .filter(DocumentImage.document_id == document.id, DocumentImage.caption.is_(None))
@@ -133,6 +129,11 @@ class IngestionPipeline:
 
             try:
                 caption = self.image_captioner.caption(image_bytes)
+            except ResourceExhausted:
+                # Quota exhausted — every remaining image will fail identically.
+                # Stop immediately instead of burning time on guaranteed failures.
+                logger.error("quota_exhausted_stopping_batch", document_id=document.id, remaining=len(pending))
+                raise RuntimeError("Gemini quota exhausted — resume later once quota resets")
             except Exception as exc:
                 logger.warning("image_caption_failed", image_id=image.id, error=str(exc))
                 failures += 1
@@ -149,7 +150,6 @@ class IngestionPipeline:
 
         if failures > 0:
             raise RuntimeError(f"{failures} image(s) failed captioning — document not fully ready")
-
     def _is_too_small(self, image_bytes: bytes) -> bool:
         from io import BytesIO
         from PIL import Image
