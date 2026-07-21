@@ -7,22 +7,18 @@ from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 
 from app.config import get_settings
 
+#engine connection
 settings = get_settings()
-print("DATABASE URL:", settings.database_url)
 engine = create_engine(settings.database_url, pool_pre_ping=True)
-#ool_pre_ping checks the whether the connection is still alive, 
+#pool_pre_ping checks the whether the connection is still alive, 
 # if dead, a fresh connection is created 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-EMBEDDING_DIM =  3072 # text-embedding-004 output dimension
+EMBEDDING_DIM =  3072 # gemini embedding 001 output dimension
 
 
 class Base(DeclarativeBase):
     pass
-
-
-
-
 
 
 class Document(Base):

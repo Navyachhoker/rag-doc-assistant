@@ -1,4 +1,7 @@
-
+#lru_cache stands for Least Recently Used Cache
+#It is a decorator that stores the results of function calls 
+# so that if the same arguments are used again, 
+# Python returns the cached result instead of recomputing it
 from functools import lru_cache
 
 from app.embeddings.image_captioner import ImageCaptioner
@@ -12,6 +15,8 @@ from app.storage.image_store import ImageStore
 @lru_cache
 def get_text_embedder() -> TextEmbedder:
     return TextEmbedder()
+#textembedder loads model "gemini-embedding-001" repeatedly 
+#so we use lru_cache to save this
 
 
 @lru_cache
