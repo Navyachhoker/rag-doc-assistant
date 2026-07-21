@@ -12,11 +12,11 @@ from app.services import query_service
 router = APIRouter(tags=["query"])
 
 
-@router.post("/query", response_model=QueryResponse)
+@router.post("/query", response_model=QueryResponse)# tells that response should match QueryResponse schema
 async def query_documents(
     request: QueryRequest,
     db: Session = Depends(get_db),
-    retriever: Retriever = Depends(get_retriever),
+    retriever: Retriever = Depends(get_retriever),#creating retriever obj for q embedding generation
     generator: AnswerGenerator = Depends(get_answer_generator),
 ):
     return query_service.answer_question(
