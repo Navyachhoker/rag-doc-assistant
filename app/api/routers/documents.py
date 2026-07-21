@@ -16,13 +16,14 @@ async def upload_document(
     db: Session = Depends(get_db),
     pipeline: IngestionPipeline = Depends(get_ingestion_pipeline),
 ):
+    #try-except block used for catching errors and return proper HTTP response
     try:
         document = await document_service.process_upload(file, db, pipeline)
     except document_service.UnsupportedFileTypeError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except document_service.FileTooLargeError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-
+    #success response
     return DocumentUploadResponse(
         document_id=document.id,
         filename=document.filename,
@@ -31,7 +32,7 @@ async def upload_document(
     )
 
 
-@router.get("", response_model=list[DocumentUploadResponse])
+@router.get("", response_model=list[DocumentUploadResponse])#response returned by this endpoint must follow documentuploadresponse schema
 async def list_documents(db: Session = Depends(get_db)):
     documents = document_service.list_all_documents(db)
     return [
