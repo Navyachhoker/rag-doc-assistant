@@ -14,7 +14,7 @@ Use "type": "bar" for comparisons, "line" for trends over time, "pie" for propor
 6. Be concise and direct. Do not pad the answer with unnecessary preamble.
 """
 
-# USER_PROMPT_TEMPLATE, build_text_context, build_image_context unchanged from Phase 6
+
 
 USER_PROMPT_TEMPLATE = """Question: {question}
 

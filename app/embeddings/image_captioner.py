@@ -24,21 +24,21 @@ Be specific and factual. Do not speculate beyond what's visible. Write 2-4 sente
 
 class ImageCaptioner:
     def __init__(self) -> None:
-        self.model = genai.GenerativeModel(settings.vision_model)
+        self.model = genai.GenerativeModel(settings.vision_model)#creates gemini model obj once 
 
     @retry(stop=stop_after_attempt(3),
-           wait=wait_exponential(multiplier=1, min=2, max=10),
+           wait=wait_exponential(multiplier=1, min=2, max=10),#increases the wait time for each try, capped at 10s
            retry=retry_if_not_exception_type(ResourceExhausted),
            )
     def caption(self, image_bytes: bytes) -> str:
         """
-        Returns "" ONLY for genuinely non-informative images (too small).
+        Returns "" ONLY for genuinely non-informative images (too small)
         Any real API error is allowed to raise — the caller is responsible
-        for catching it and deciding how to handle the failure.
+        for catching it and deciding how to handle the failure
         """
         image = Image.open(io.BytesIO(image_bytes))
 
-        if image.width < 50 or image.height < 50:
+        if image.width < 50 or image.height < 50: #if image is too samll
             return ""
 
         response = self.model.generate_content([CAPTION_PROMPT, image])

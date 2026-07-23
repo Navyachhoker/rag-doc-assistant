@@ -27,7 +27,7 @@ def generate_chart(spec: dict) -> bytes:
         "x_label": str (optional),
         "y_label": str (optional)
     }
-    Returns PNG image bytes.
+    Returns PNG image bytes
     """
     chart_type = spec.get("type", "bar").lower()
     if chart_type not in SUPPORTED_CHART_TYPES:

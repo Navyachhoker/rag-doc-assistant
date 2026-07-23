@@ -31,5 +31,6 @@ class TextEmbedder:
         )
         return result["embedding"]
 
+    #used for embedding many chunks
     def embed_batch(self, texts: list[str], task_type: str = "retrieval_document") -> list[list[float]]:
         return [self.embed(t, task_type=task_type) for t in texts]

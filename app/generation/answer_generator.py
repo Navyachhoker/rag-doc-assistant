@@ -16,7 +16,7 @@ from app.storage.image_store import ImageStore
 settings = get_settings()
 logger = get_logger(__name__)
 
-IMAGE_TAG_PATTERN = re.compile(r"\[IMAGE:(\d+)\]")
+IMAGE_TAG_PATTERN = re.compile(r"\[IMAGE:(\d+)\]")#RE patterns used to detect special tags in text
 CHART_TAG_PATTERN = re.compile(r"\[CHART:(\{.*?\})\]", re.DOTALL)
 
 
@@ -65,10 +65,10 @@ class AnswerGenerator:
         self, raw_answer: str, images: list[RetrievedImageResult]
     ) -> tuple[str, list[RetrievedImageResult]]:
         used_images: list[RetrievedImageResult] = []
-
+        #replaces image number with actual image
         def replace_tag(match: re.Match) -> str:
             idx = int(match.group(1)) - 1
-            if 0 <= idx < len(images):
+            if 0 <= idx < len(images):#ensure img exists
                 img = images[idx]
                 used_images.append(img)
                 return f"\n\n![{img.caption}]({img.file_path})\n"
