@@ -21,7 +21,7 @@ class IngestionPipeline:
         self.text_embedder = TextEmbedder()
         self.image_captioner = ImageCaptioner()
         self.image_store = ImageStore()
-
+    #resume function
     def run(self, db: Session, document: Document, file_path: str | None = None) -> None:
         try:
             if document.status == "extracting":
